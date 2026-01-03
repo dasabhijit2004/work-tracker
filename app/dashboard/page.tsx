@@ -1,18 +1,14 @@
-import TaskList from "@/components/TaskList";
-import AddTaskForm from "@/components/AddTaskForm";
+import DashboardClient from "./DashboardClient";
 
-export default function DashboardPage({
+export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { date?: string };
+  searchParams: Promise<{ date?: string }>;
 }) {
-  const selectedDate =
-    searchParams.date || new Date().toISOString().slice(0, 10);
+  const params = await searchParams;
 
-  return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
-      <AddTaskForm />
-      <TaskList selectedDate={selectedDate} />
-    </div>
-  );
+  const selectedDate =
+    params.date || new Date().toISOString().slice(0, 10);
+
+  return <DashboardClient selectedDate={selectedDate} />;
 }

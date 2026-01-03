@@ -20,7 +20,13 @@ type Task = {
   createdAt: string;
 };
 
-export default function TaskList({ selectedDate }: { selectedDate: string }) {
+export default function TaskList({
+  selectedDate,
+  refreshKey,
+}: {
+  selectedDate: string;
+  refreshKey: number;
+}) {
   const [filter, setFilter] = useState<"all" | "completed" | "pending">("all");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,32 +36,26 @@ export default function TaskList({ selectedDate }: { selectedDate: string }) {
 
   useEffect(() => {
     async function fetchTasks() {
-      try {
-        setLoading(true);
-        const data = await getTasksByDate(selectedDate, filter);
-        setTasks(data as Task[]);
-      } catch {
-        toast.error("Failed to load tasks");
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      const data = await getTasksByDate(selectedDate, "all");
+      setTasks(data as Task[]);
+      setLoading(false);
     }
 
     fetchTasks();
-  }, [selectedDate, filter]);
+  }, [selectedDate, refreshKey]); // 🔑 refreshKey added
 
   if (loading) return <TaskSkeleton />;
 
-  if (tasks.length === 0) {
-    return (
-      <div className="rounded-lg border p-6 text-center text-gray-500">
-        No tasks for this date.
-      </div>
-    );
-  }
-
   const pendingTasks = tasks.filter((t) => !t.isCompleted);
   const completedTasks = tasks.filter((t) => t.isCompleted);
+
+  const visibleTasks =
+    filter === "all"
+      ? tasks
+      : filter === "completed"
+        ? completedTasks
+        : pendingTasks;
 
   async function handleToggle(task: Task, checked: boolean) {
     const prevTasks = [...tasks];
@@ -95,11 +95,10 @@ export default function TaskList({ selectedDate }: { selectedDate: string }) {
 
           <div>
             <h3
-              className={`font-medium transition-all duration-300 ${
-                task.isCompleted
-                  ? "line-through text-gray-400 opacity-70"
-                  : ""
-              }`}
+              className={`font-medium transition-all duration-300 ${task.isCompleted
+                ? "line-through text-gray-400 opacity-70"
+                : ""
+                }`}
             >
               {task.title}
             </h3>
@@ -130,35 +129,58 @@ export default function TaskList({ selectedDate }: { selectedDate: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
+      {/* Filters – ALWAYS visible */}
       <div className="flex gap-2 flex-wrap">
         {["all", "completed", "pending"].map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f as any)}
-            className={`rounded px-3 py-1 text-sm ${
-              filter === f ? "bg-black text-white" : "border text-gray-600"
-            }`}
+            className={`rounded px-3 py-1 text-sm ${filter === f
+              ? "bg-black text-white"
+              : "border text-gray-600"
+              }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>
 
-      {/* Pending */}
-      {pendingTasks.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-600">Pending</h2>
-          <ul className="space-y-3">{pendingTasks.map(renderTask)}</ul>
+      {/* Empty State (per filter) */}
+      {visibleTasks.length === 0 && (
+        <div className="rounded-lg border p-6 text-center text-gray-500">
+          {filter === "all" && "No tasks for this date."}
+          {filter === "completed" && "No completed tasks yet."}
+          {filter === "pending" && "No pending tasks."}
         </div>
       )}
 
-      {/* Completed */}
-      {completedTasks.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-600">Completed</h2>
-          <ul className="space-y-3">{completedTasks.map(renderTask)}</ul>
-        </div>
+      {/* Task Sections */}
+      {visibleTasks.length > 0 && (
+        <>
+          {(filter === "all" || filter === "pending") &&
+            pendingTasks.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-gray-600">
+                  Pending
+                </h2>
+                <ul className="space-y-3">
+                  {pendingTasks.map(renderTask)}
+                </ul>
+              </div>
+            )}
+
+          {(filter === "all" || filter === "completed") &&
+            completedTasks.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-gray-600">
+                  Completed
+                </h2>
+                <ul className="space-y-3">
+                  {completedTasks.map(renderTask)}
+                </ul>
+              </div>
+            )}
+        </>
       )}
 
       {/* Edit Modal */}
@@ -171,10 +193,10 @@ export default function TaskList({ selectedDate }: { selectedDate: string }) {
               prev.map((t) =>
                 t.taskId === editingTask.taskId
                   ? {
-                      ...t,
-                      title: newTitle,
-                      selectedDate: new Date(newDate).toISOString(),
-                    }
+                    ...t,
+                    title: newTitle,
+                    selectedDate: new Date(newDate).toISOString(),
+                  }
                   : t
               )
             );
